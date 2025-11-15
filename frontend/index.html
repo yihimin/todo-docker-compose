@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List - Docker Compose</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Todo List</h1>
+        <div class="subtitle">Docker Compose 기반 웹서비스</div>
+
+        <form id="todoForm" class="form-container">
+            <input type="text" id="taskInput" placeholder="새로운 할 일을 입력하세요..." required>
+            <button type="submit">추가</button>
+        </form>
+
+        <ul class="todo-list" id="todoList">
+            <!-- JavaScript로 동적으로 생성됩니다 -->
+        </ul>
+
+        <div class="stats" id="stats" style="display: none;">
+            <!-- JavaScript로 동적으로 업데이트됩니다 -->
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

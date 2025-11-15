@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  # 프론트엔드 서비스 (Nginx)
+  frontend:
+    build: ./frontend
+    container_name: todo-frontend
+    ports:
+      - "3001:80"
+    networks:
+      - todo-network
+    restart: unless-stopped
+
+  # 백엔드 서비스 (PHP + Apache)
+  backend:
+    build: ./backend
+    container_name: todo-backend
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+    networks:
+      - todo-network
+    restart: unless-stopped
+
+  # 데이터베이스 서비스 (MySQL)
+  db:
+    build: ./db
+    container_name: todo-db
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: todo_app
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - todo-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pexample"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# 네트워크 정의
+networks:
+  todo-network:
+    driver: bridge
+
+# 볼륨 정의 (데이터베이스 영속성)
+volumes:
+  db_data:

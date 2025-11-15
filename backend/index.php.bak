@@ -1,0 +1,277 @@
+<?php
+header('Content-Type: text/html; charset=utf-8');
+
+// 데이터베이스 연결 설정
+$servername = "db";
+$username = "root";
+$password = "example";
+$dbname = "todo_app";
+
+// MySQL 연결
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// 연결 확인
+if ($conn->connect_error) {
+    die("데이터베이스 연결 실패: " . $conn->connect_error);
+}
+
+// UTF-8 설정
+$conn->set_charset("utf8mb4");
+
+// POST 요청 처리 (새 할일 추가)
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["task"])) {
+    $task = $conn->real_escape_string($_POST["task"]);
+    if (!empty($task)) {
+        $sql = "INSERT INTO todos (task, created_at) VALUES ('$task', NOW())";
+        $conn->query($sql);
+    }
+    // POST 후 리다이렉트 (새로고침 시 중복 제출 방지)
+    header("Location: index.php");
+    exit();
+}
+
+// DELETE 요청 처리 (할일 삭제)
+if (isset($_GET["delete"])) {
+    $id = intval($_GET["delete"]);
+    $sql = "DELETE FROM todos WHERE id = $id";
+    $conn->query($sql);
+    header("Location: index.php");
+    exit();
+}
+
+// 완료 상태 토글
+if (isset($_GET["toggle"])) {
+    $id = intval($_GET["toggle"]);
+    $sql = "UPDATE todos SET completed = NOT completed WHERE id = $id";
+    $conn->query($sql);
+    header("Location: index.php");
+    exit();
+}
+
+// 전체 할일 조회
+$result = $conn->query("SELECT * FROM todos ORDER BY created_at DESC");
+?>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List - Docker Compose</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .form-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .todo-list {
+            list-style: none;
+        }
+
+        .todo-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .todo-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .todo-item.completed {
+            opacity: 0.6;
+        }
+
+        .todo-item.completed .todo-text {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .checkbox.checked {
+            background: #667eea;
+        }
+
+        .checkbox.checked::after {
+            content: "✓";
+            color: white;
+            font-size: 16px;
+        }
+
+        .todo-text {
+            flex: 1;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .delete-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .delete-btn:hover {
+            background: #ff5252;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .stats {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Todo List</h1>
+        <div class="subtitle">Docker Compose 기반 웹서비스</div>
+
+        <form method="POST" class="form-container">
+            <input type="text" name="task" placeholder="새로운 할 일을 입력하세요..." required>
+            <button type="submit">추가</button>
+        </form>
+
+        <ul class="todo-list">
+            <?php if ($result && $result->num_rows > 0): ?>
+                <?php while($row = $result->fetch_assoc()): ?>
+                    <li class="todo-item <?= $row['completed'] ? 'completed' : '' ?>">
+                        <a href="?toggle=<?= $row['id'] ?>" style="text-decoration: none;">
+                            <div class="checkbox <?= $row['completed'] ? 'checked' : '' ?>"></div>
+                        </a>
+                        <span class="todo-text"><?= htmlspecialchars($row['task']) ?></span>
+                        <a href="?delete=<?= $row['id'] ?>" onclick="return confirm('정말 삭제하시겠습니까?')">
+                            <button type="button" class="delete-btn">삭제</button>
+                        </a>
+                    </li>
+                <?php endwhile; ?>
+            <?php else: ?>
+                <div class="empty-state">
+                    <p>아직 할 일이 없습니다.</p>
+                    <p>위에서 새로운 할 일을 추가해보세요!</p>
+                </div>
+            <?php endif; ?>
+        </ul>
+
+        <?php if ($result && $result->num_rows > 0): ?>
+            <div class="stats">
+                <?php
+                $total = $result->num_rows;
+                $result->data_seek(0);
+                $completed = 0;
+                while($row = $result->fetch_assoc()) {
+                    if ($row['completed']) $completed++;
+                }
+                ?>
+                전체 <?= $total ?>개 | 완료 <?= $completed ?>개 | 남은 할 일 <?= $total - $completed ?>개
+            </div>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
+<?php
+$conn->close();
+?>
