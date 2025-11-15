@@ -18,7 +18,13 @@ PHP와 MySQL을 사용하며, 백엔드와 데이터베이스를 별도의 컨�
 ┌─────────────────┐
 │   사용자 브라우저   │
 └────────┬────────┘
-         │ HTTP (Port 8080)
+         │ HTTP (Port 3001)
+         ▼
+┌─────────────────┐
+│ Frontend 컨테이너 │
+│     (Nginx)     │
+└────────┬────────┘
+         │ API (Port 8080)
          ▼
 ┌─────────────────┐
 │  Backend 컨테이너  │
@@ -34,11 +40,15 @@ PHP와 MySQL을 사용하며, 백엔드와 데이터베이스를 별도의 컨�
 
 ### 컨테이너 구성
 
-1. **backend** - PHP 8.2 + Apache 웹 서버
-   - 포트: 8080:80
-   - 역할: 웹 UI 제공 및 비즈니스 로직 처리
+1. **frontend** - Nginx 웹 서버
+   - 포트: 3001:80
+   - 역할: 정적 파일 제공 (HTML, CSS, JavaScript)
 
-2. **db** - MySQL 8.0 데이터베이스
+2. **backend** - PHP 8.2 + Apache API 서버
+   - 포트: 8080:80
+   - 역할: RESTful API 제공 및 비즈니스 로직 처리
+
+3. **db** - MySQL 8.0 데이터베이스
    - 포트: 3306 (내부)
    - 역할: Todo 데이터 저장 및 관리
 
@@ -50,9 +60,15 @@ PHP와 MySQL을 사용하며, 백엔드와 데이터베이스를 별도의 컨�
 todo-docker-compose/
 ├── docker-compose.yml    # Docker Compose 설정 파일
 ├── README.md            # 프로젝트 설명서
+├── frontend/            # 프론트엔드 디렉토리
+│   ├── Dockerfile       # 프론트엔드 컨테이너 이미지 빌드 파일
+│   ├── nginx.conf       # Nginx 설정 파일
+│   ├── index.html       # 메인 HTML 파일
+│   ├── style.css        # 스타일시트
+│   └── app.js           # JavaScript 파일 (UI 로직)
 ├── backend/             # 백엔드 디렉토리
 │   ├── Dockerfile       # 백엔드 컨테이너 이미지 빌드 파일
-│   └── index.php        # Todo List 웹 애플리케이션
+│   └── api.php          # RESTful API 엔드포인트
 └── db/                  # 데이터베이스 디렉토리
     ├── Dockerfile       # DB 컨테이너 이미지 빌드 파일
     └── init.sql         # 데이터베이스 초기화 스크립트
@@ -92,8 +108,10 @@ docker-compose up -d --build
 브라우저에서 다음 주소로 접속합니다:
 
 ```
-http://localhost:8080
+http://localhost:3001
 ```
+
+**참고**: 백엔드 API는 `http://localhost:8080`에서 직접 접근 가능합니다.
 
 ### 4️⃣ 컨테이너 중지
 
@@ -121,26 +139,57 @@ docker-compose down -v
 
 ### docker-compose.yml
 
-Docker Compose 설정 파일로, 여러 컨테이너를 한 번에 관리합니다.
+Docker Compose 설정 파일로, 3개의 컨테이너를 한 번에 관리합니다.
 
 ```yaml
 services:
-  backend:  # PHP 백엔드 컨테이너
-  db:       # MySQL 데이터베이스 컨테이너
+  frontend:  # Nginx 프론트엔드 컨테이너
+  backend:   # PHP 백엔드 API 컨테이너
+  db:        # MySQL 데이터베이스 컨테이너
 
-networks:   # 컨테이너 간 통신 네트워크
-volumes:    # 데이터 영속성 볼륨
+networks:    # 컨테이너 간 통신 네트워크
+volumes:     # 데이터 영속성 볼륨
 ```
+
+### frontend/Dockerfile
+
+Nginx 웹 서버 이미지를 빌드합니다.
+
+```dockerfile
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY . /usr/share/nginx/html/
+```
+
+### frontend/nginx.conf
+
+Nginx 설정 파일로 프론트엔드 라우팅 및 프록시 설정을 담당합니다.
 
 ### backend/Dockerfile
 
-PHP + Apache 웹 서버 이미지를 빌드합니다.
+PHP + Apache API 서버 이미지를 빌드합니다.
 
 ```dockerfile
 FROM php:8.2-apache
 RUN docker-php-ext-install mysqli
 COPY . /var/www/html/
 ```
+
+### backend/api.php
+
+RESTful API 엔드포인트를 제공합니다.
+
+- MySQL 연결 및 데이터 CRUD 처리
+- JSON 형식의 응답 반환
+- GET, POST, PUT, DELETE 요청 처리
+
+### frontend/app.js
+
+프론트엔드 JavaScript 파일입니다.
+
+- API 호출 및 데이터 처리
+- DOM 조작 및 이벤트 핸들링
+- UI 업데이트 로직
 
 ### db/Dockerfile
 
@@ -150,14 +199,6 @@ MySQL 데이터베이스 이미지를 빌드하고 초기화 스크립트를 포
 FROM mysql:8.0
 COPY init.sql /docker-entrypoint-initdb.d/
 ```
-
-### backend/index.php
-
-Todo List 웹 애플리케이션의 메인 파일입니다.
-
-- MySQL 연결 및 데이터 CRUD 처리
-- HTML/CSS를 통한 UI 렌더링
-- POST/GET 요청 처리
 
 ### db/init.sql
 
@@ -177,11 +218,15 @@ CREATE TABLE todos (
 
 ## 🛠️ 트러블슈팅
 
-### ❌ 포트 8080이 이미 사용 중인 경우
+### ❌ 포트가 이미 사용 중인 경우
 
 `docker-compose.yml` 파일에서 포트 번호를 변경합니다:
 
 ```yaml
+frontend:
+  ports:
+    - "3002:80"  # 3001 대신 3002 사용
+
 backend:
   ports:
     - "9090:80"  # 8080 대신 9090 사용
@@ -224,10 +269,12 @@ SELECT * FROM todos;
 
 ## 📝 개발 환경
 
+- **Frontend**: Nginx (Alpine) + HTML5 + CSS3 + JavaScript (ES6+)
 - **Backend**: PHP 8.2 + Apache 2.4
 - **Database**: MySQL 8.0
 - **Containerization**: Docker + Docker Compose
 - **OS**: Linux (Docker 컨테이너)
+- **Architecture**: 3-Tier (Frontend - Backend - Database)
 
 ---
 
@@ -236,10 +283,13 @@ SELECT * FROM todos;
 이 프로젝트를 통해 다음을 학습할 수 있습니다:
 
 1. ✅ Docker Compose를 활용한 멀티 컨테이너 애플리케이션 구성
-2. ✅ PHP와 MySQL 연동 방법
-3. ✅ Dockerfile 작성 및 이미지 빌드
-4. ✅ 컨테이너 간 네트워크 통신
-5. ✅ Docker 볼륨을 통한 데이터 영속성 관리
+2. ✅ 3-Tier 아키텍처 설계 및 구현 (Frontend - Backend - Database 분리)
+3. ✅ RESTful API 설계 및 구현
+4. ✅ Nginx를 활용한 정적 파일 서빙
+5. ✅ PHP와 MySQL 연동 방법
+6. ✅ Dockerfile 작성 및 이미지 빌드
+7. ✅ 컨테이너 간 네트워크 통신
+8. ✅ Docker 볼륨을 통한 데이터 영속성 관리
 
 ---
 
